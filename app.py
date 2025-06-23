@@ -73,55 +73,65 @@ def remove_name_route():
 
 ### 🔄 POLLING CHAT YOUTUBE ###
 def polling_chat():
-    video_id = get_video_id()
-    if not video_id:
-        print("❌ Video ID belum diatur.")
-        return
+    print("🚀 Memulai loop polling YouTube chat...")
 
-    print(f"▶️ Mulai polling chat untuk video: {video_id}")
+    while True:
+        video_id = get_video_id()
+        if not video_id:
+            print("⏳ Menunggu video ID diatur melalui /set_video_id ...")
+            time.sleep(3)
+            continue
 
-    try:
-        chat = pytchat.create(video_id=video_id)
+        print(f"▶️ Mulai polling chat untuk video: {video_id}")
 
-        if not chat.is_alive():
-            print("❌ Chat tidak aktif (mungkin video tidak live atau ID salah).")
-            return
+        try:
+            chat = pytchat.create(video_id=video_id)
 
-        last_message_time = time.time()
+            if not chat.is_alive():
+                print("❌ Chat tidak aktif (video mungkin tidak live atau ID salah).")
+                # Hapus video_id dari Firebase agar user dipaksa input ulang
+                requests.delete(f"{FIREBASE_URL}/config/video_id.json")
+                print("🗑️ Video ID telah dihapus. Tunggu input baru.")
+                time.sleep(3)
+                continue
 
-        while chat.is_alive():
-            try:
-                found_chat = False
-                print("💤 Polling aktif... menunggu pesan...")
-                for c in chat.get().sync_items():
-                    message = c.message.strip()
-                    if len(message.split()) == 1 and len(message) <= 8:
-                        print(f"✅ Simpan dari chat: {message}")
-                        add_name(message)
-                        found_chat = True
-                        last_message_time = time.time()
+            last_message_time = time.time()
+
+            while chat.is_alive():
+                try:
+                    found_chat = False
+                    print("💤 Polling aktif... menunggu pesan...")
+
+                    for c in chat.get().sync_items():
+                        message = c.message.strip()
+                        if len(message.split()) == 1 and len(message) <= 8:
+                            print(f"✅ Simpan dari chat: {message}")
+                            add_name(message)
+                            found_chat = True
+                            last_message_time = time.time()
+                            time.sleep(10)
+                        else:
+                            print(f"❌ Diabaikan: {message}")
+
+                    if not found_chat and time.time() - last_message_time >= 15:
+                        random_names = get_random_names()
+                        if random_names:
+                            random_name = random.choice(random_names)
+                            print(f"🔄 Pakai nama random: {random_name}")
+                            add_name(random_name)
+                            last_message_time = time.time()
                         time.sleep(10)
-                    else:
-                        print(f"❌ Diabaikan: {message}")
 
-                # fallback: tidak ada chat selama 15 detik
-                if not found_chat and time.time() - last_message_time >= 15:
-                    random_names = get_random_names()
-                    if random_names:
-                        random_name = random.choice(random_names)
-                        print(f"🔄 Pakai nama random: {random_name}")
-                        add_name(random_name)
-                        last_message_time = time.time()
-                    time.sleep(10)
+                except Exception as e:
+                    print("❌ Error saat polling chat:", e)
+                    time.sleep(5)
 
-            except Exception as e:
-                print("❌ Error saat polling chat:", e)
-                time.sleep(5)
+        except Exception as e:
+            print("❌ Gagal membuat objek chat:", e)
+            time.sleep(3)
 
-    except Exception as e:
-        print("❌ Gagal membuat objek chat:", e)
+        print("🔁 Kembali ke awal polling...")
 
-    print("🔚 polling_chat selesai. Program berhenti.")
 
 ### 🚀 INISIASI SAAT RUN ###
 if __name__ == '__main__':
